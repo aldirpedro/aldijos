@@ -1,0 +1,14 @@
+{
+  "name": "aldijos",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Aldijos — plataforma assíncrona de atividades pedagógicas (protótipo funcional).",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "start": "node scripts/serve.js",
+    "build": "node scripts/build.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

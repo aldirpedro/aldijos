@@ -1,0 +1,5 @@
+{
+  "buildCommand": "echo 'Aldijos é um sítio estático — sem passo de build necessário'",
+  "installCommand": "echo 'sem dependências a instalar'",
+  "outputDirectory": "public"
+}
