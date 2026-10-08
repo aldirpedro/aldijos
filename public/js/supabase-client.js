@@ -124,6 +124,19 @@
    * papel por omissão ALUNO — só muda para ADMIN/PROFESSOR com uma instrução
    * SQL pontual (ver docs/10_decisoes_tecnicas.md).
    */
+  // Admin cria uma conta para outra pessoa (professor/aluno/admin). signUp()
+  // troca a sessão ativa para a conta nova — por isso guardamos a sessão do
+  // admin antes e repomo-la a seguir, sem precisar da palavra-passe dele outra vez.
+  async function createUserAccount(email, password, name, role) {
+    const { data: { session: adminSession } } = await supa.auth.getSession();
+    const { data, error } = await supa.auth.signUp({ email, password, options: { data: { name } } });
+    if (error) { console.error(error); if (window.toast) toast(error.message || 'Não foi possível criar a conta.', 'error'); return null; }
+    if (adminSession) await supa.auth.setSession({ access_token: adminSession.access_token, refresh_token: adminSession.refresh_token });
+    if (role && role !== 'ALUNO') await supa.from('profiles').update({ role }).eq('id', data.user.id);
+    await refreshMirror();
+    return data.user.id;
+  }
+
   async function ensureSession(email, password) {
     const { error } = await supa.auth.signInWithPassword({ email, password });
     if (!error) return;
@@ -182,7 +195,7 @@
     for (const e of [pErr, cErr, clErr, mErr, eErr, tErr, aErr, sErr]) if (e) throw e;
 
     return {
-      users: profiles.map(p => ({ id: p.id, name: p.name, email: '', role: p.role, active: p.active, passwordHash: '', createdAt: p.created_at })),
+      users: profiles.map(p => ({ id: p.id, name: p.name, email: p.email || '', role: p.role, active: p.active, passwordHash: '', createdAt: p.created_at })),
       courses: courses.map(c => ({ id: String(c.id), name: c.name, area: c.area, short: c.short, description: c.description, years: c.years, photo: c.photo })),
       classes: classes.map(c => ({ id: String(c.id), courseId: String(c.course_id), name: c.name, year: c.year })),
       modules: modules.map(m => ({ id: String(m.id), courseId: String(m.course_id), name: m.name, hours: m.hours })),
@@ -209,6 +222,6 @@
 
   window.Supa = {
     client: supa, refreshCache, saveEvent, toggleEvent, deleteEvent, subscribeRealtime, ensureSession, endSession,
-    refreshPublicHome, subscribeHomeRealtime, refreshMirror, subscribeMirrorRealtime,
+    refreshPublicHome, subscribeHomeRealtime, refreshMirror, subscribeMirrorRealtime, createUserAccount,
   };
 })();
