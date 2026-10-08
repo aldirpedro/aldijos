@@ -132,5 +132,83 @@
   }
   async function endSession() { await supa.auth.signOut(); }
 
-  window.Supa = { client: supa, refreshCache, saveEvent, toggleEvent, deleteEvent, subscribeRealtime, ensureSession, endSession, refreshPublicHome, subscribeHomeRealtime };
+  /*
+   * Espelho completo (fase 4): o documento local `db` passa a ser alimentado
+   * inteiramente pelo Supabase depois de autenticar — turmas, módulos,
+   * atividades (com perguntas/opções), submissões (com respostas/ficheiros)
+   * e utilizadores. Toda a lógica de apresentação (teacher.js/student.js/
+   * admin.js) continua exatamente igual, porque só lê de `db`.
+   */
+  function mapQuestion(q) {
+    return {
+      id: String(q.id), type: q.type, statement: q.statement, points: q.points,
+      options: q.type === 'MC' ? (q.question_options || []).slice().sort((a, b) => a.position - b.position).map(o => ({ id: String(o.id), text: o.text, correct: o.correct })) : undefined,
+      correctBool: q.correct_bool,
+    };
+  }
+  function mapActivity(a) {
+    return {
+      id: String(a.id), teacherId: a.teacher_id, moduleId: String(a.module_id), classId: String(a.class_id),
+      title: a.title, description: a.description || '', deadline: a.deadline, status: a.status,
+      createdAt: a.created_at, publishedAt: a.published_at,
+      questions: (a.questions || []).slice().sort((x, y) => x.position - y.position).map(mapQuestion),
+    };
+  }
+  function mapSubmission(s) {
+    return {
+      id: String(s.id), activityId: String(s.activity_id), studentId: s.student_id, status: s.status,
+      submittedAt: s.submitted_at, autoScore: s.auto_score, finalScore: s.final_score,
+      gradedBy: s.graded_by, gradedAt: s.graded_at, feedback: s.feedback || '',
+      answers: (s.answers || []).map(a => ({ questionId: String(a.question_id), optionId: a.option_id ? String(a.option_id) : null, bool: a.bool_value, text: a.text_value, isCorrect: a.is_correct, score: a.score })),
+      files: (s.submission_files || []).map(f => ({ id: String(f.id), name: f.name, size: f.size, dataUrl: f.file_url, uploadedAt: f.uploaded_at })),
+    };
+  }
+
+  async function buildMirror() {
+    const [
+      { data: profiles, error: pErr }, { data: courses, error: cErr }, { data: classes, error: clErr },
+      { data: modules, error: mErr }, { data: enrollments, error: eErr }, { data: teaching, error: tErr },
+      { data: activities, error: aErr }, { data: submissions, error: sErr },
+    ] = await Promise.all([
+      supa.from('profiles').select('*'),
+      supa.from('courses').select('*').order('id'),
+      supa.from('classes').select('*').order('id'),
+      supa.from('modules').select('*').order('id'),
+      supa.from('enrollments').select('*'),
+      supa.from('teaching').select('*'),
+      supa.from('activities').select('*, questions(*, question_options(*))').order('id'),
+      supa.from('submissions').select('*, answers(*), submission_files(*)').order('id'),
+    ]);
+    for (const e of [pErr, cErr, clErr, mErr, eErr, tErr, aErr, sErr]) if (e) throw e;
+
+    return {
+      users: profiles.map(p => ({ id: p.id, name: p.name, email: '', role: p.role, active: p.active, passwordHash: '', createdAt: p.created_at })),
+      courses: courses.map(c => ({ id: String(c.id), name: c.name, area: c.area, short: c.short, description: c.description, years: c.years, photo: c.photo })),
+      classes: classes.map(c => ({ id: String(c.id), courseId: String(c.course_id), name: c.name, year: c.year })),
+      modules: modules.map(m => ({ id: String(m.id), courseId: String(m.course_id), name: m.name, hours: m.hours })),
+      enrollments: enrollments.map(e => ({ studentId: e.student_id, classId: String(e.class_id) })),
+      teaching: teaching.map(t => ({ teacherId: t.teacher_id, moduleId: String(t.module_id), classId: String(t.class_id) })),
+      activities: activities.map(mapActivity),
+      submissions: submissions.map(mapSubmission),
+    };
+  }
+
+  async function refreshMirror() {
+    const mirror = await buildMirror();
+    App.store.replaceDb(mirror);
+  }
+
+  let mirrorChannel = null;
+  function subscribeMirrorRealtime() {
+    if (mirrorChannel) return;
+    const tables = ['profiles', 'courses', 'classes', 'modules', 'enrollments', 'teaching', 'activities', 'questions', 'question_options', 'submissions', 'answers', 'submission_files'];
+    let ch = supa.channel('mirror-sync');
+    tables.forEach(t => { ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => refreshMirror().catch(e => console.error(e))); });
+    mirrorChannel = ch.subscribe();
+  }
+
+  window.Supa = {
+    client: supa, refreshCache, saveEvent, toggleEvent, deleteEvent, subscribeRealtime, ensureSession, endSession,
+    refreshPublicHome, subscribeHomeRealtime, refreshMirror, subscribeMirrorRealtime,
+  };
 })();

@@ -667,8 +667,13 @@
     // Substitui os cursos (com módulos já incluídos) e as 5 estatísticas públicas
     // por uma versão vinda do Supabase — mesma ideia do setEvents() acima.
     function setPublicHomeLive(coursesLive, liveStats) { db.coursesLive = coursesLive; db.liveStats = liveStats; commit(['courses', 'stats']); }
+    // Substitui TODO o documento local por uma versão vinda do Supabase — usado
+    // depois de autenticar a sério (ver public/js/supabase-client.js). Os
+    // métodos as(userId)/publicHome()/etc. continuam a funcionar sem alterações,
+    // porque continuam só a ler de `db`; só a origem dos dados muda.
+    function replaceDb(partial) { Object.assign(db, partial); commit(['*']); }
 
-    return { init, wasMigrated: () => migrated, resetDemo, subscribe, reload, session, login, logout, register, publicHome, stats, as, publishedEvents: () => publishedEvents().map(e => ({ ...e })), setEvents, setPublicHomeLive, _db: () => db };
+    return { init, wasMigrated: () => migrated, resetDemo, subscribe, reload, session, login, logout, register, publicHome, stats, as, publishedEvents: () => publishedEvents().map(e => ({ ...e })), setEvents, setPublicHomeLive, replaceDb, _db: () => db };
   }
 
   return {
