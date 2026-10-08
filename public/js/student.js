@@ -99,8 +99,8 @@ ACTIONS['submit-go'] = safe(async el => {
   if (error) { toast(error.message || 'Não foi possível submeter.', 'error'); closeModal(); return; }
   delete App.answers[id]; closeModal();
   await Supa.refreshMirror();
-  toast(data.status === 'CORRIGIDA' ? 'Submetida e corrigida automaticamente.' : 'Submetida. O professor vai avaliar as respostas abertas.');
-  go('resultado', { id: data.submission_id });
+  toast(data.out_status === 'CORRIGIDA' ? 'Submetida e corrigida automaticamente.' : 'Submetida. O professor vai avaliar as respostas abertas.');
+  go('resultado', { id: data.out_submission_id });
 });
 
 /* ---------- resultados ---------- */
