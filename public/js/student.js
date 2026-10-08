@@ -94,8 +94,13 @@ ACTIONS['submit-ask'] = safe(async el => {
     <div class="modal-actions"><button class="btn btn-primary" data-action="submit-go" data-id="${a.id}">Sim, submeter</button><button class="btn" data-action="close-modal">Voltar</button></div></div>`, { plain: true });
 });
 ACTIONS['submit-go'] = safe(async el => {
-  const id = el.dataset.id; const r = App.svc.submit(id, App.answers[id] || {}); delete App.answers[id]; closeModal();
-  toast(r.status === 'CORRIGIDA' ? 'Submetida e corrigida automaticamente.' : 'Submetida. O professor vai avaliar as respostas abertas.'); go('resultado', { id: r.submissionId });
+  const id = el.dataset.id; const answers = App.answers[id] || {};
+  const { data, error } = await Supa.client.rpc('submit_activity', { p_activity_id: id, p_answers: answers }).single();
+  if (error) { toast(error.message || 'Não foi possível submeter.', 'error'); closeModal(); return; }
+  delete App.answers[id]; closeModal();
+  await Supa.refreshMirror();
+  toast(data.status === 'CORRIGIDA' ? 'Submetida e corrigida automaticamente.' : 'Submetida. O professor vai avaliar as respostas abertas.');
+  go('resultado', { id: data.submission_id });
 });
 
 /* ---------- resultados ---------- */
