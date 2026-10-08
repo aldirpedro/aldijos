@@ -70,7 +70,7 @@ begin
   update submissions set
     submitted_at = now(),
     auto_score = case when v_total = 0 then 0 else round((coalesce((select sum(a.score) from answers a where a.submission_id = v_submission_id), 0) / v_total) * 20, 1) end,
-    status = case when v_pending then 'SUBMETIDA' else 'CORRIGIDA' end,
+    status = (case when v_pending then 'SUBMETIDA' else 'CORRIGIDA' end)::submission_status,
     final_score = case when v_pending then null else
       case when v_total = 0 then 0 else round((coalesce((select sum(a.score) from answers a where a.submission_id = v_submission_id), 0) / v_total) * 20, 1) end
     end,
