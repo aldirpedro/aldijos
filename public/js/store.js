@@ -659,7 +659,13 @@
       return svc;
     }
 
-    return { init, wasMigrated: () => migrated, resetDemo, subscribe, reload, session, login, logout, register, publicHome, stats, as, publishedEvents: () => publishedEvents().map(e => ({ ...e })), _db: () => db };
+    // Substitui a cache local de eventos (usado quando os eventos passam a vir
+    // de uma base de dados partilhada — ver public/js/supabase-client.js —
+    // para que publicHome()/publishedEvents() continuem a funcionar sem
+    // alterações). Não mexe em mais nada do documento.
+    function setEvents(events) { db.events = events; commit(['events']); }
+
+    return { init, wasMigrated: () => migrated, resetDemo, subscribe, reload, session, login, logout, register, publicHome, stats, as, publishedEvents: () => publishedEvents().map(e => ({ ...e })), setEvents, _db: () => db };
   }
 
   return {

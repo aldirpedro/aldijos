@@ -133,10 +133,10 @@ PAGES.ADMIN.eventos = () => {
 ACTIONS['ev-new'] = () => { evForm.open = true; evForm.editing = null; App.evImg = null; renderMain(); };
 ACTIONS['ev-edit'] = el => { evForm.open = true; evForm.editing = el.dataset.id; App.evImg = null; renderMain(); window.scrollTo(0, 0); const m = $('.app-main'); if (m) m.scrollTop = 0; };
 ACTIONS['ev-cancel'] = () => { evForm.open = false; evForm.editing = null; App.evImg = null; renderMain(); };
-ACTIONS['ev-toggle'] = safe(async el => { App.svc.toggleEvent(el.dataset.id); toast('Estado do evento atualizado.'); renderMain(); });
+ACTIONS['ev-toggle'] = safe(async el => { await Supa.toggleEvent(el.dataset.id); toast('Estado do evento atualizado.'); renderMain(); });
 ACTIONS['ev-del'] = safe(async el => {
   if (App.confirm !== 'ev:' + el.dataset.id) { App.confirm = 'ev:' + el.dataset.id; return renderMain(); }
-  App.confirm = null; App.svc.deleteEvent(el.dataset.id); toast('Evento eliminado.'); renderMain();
+  App.confirm = null; await Supa.deleteEvent(el.dataset.id); toast('Evento eliminado.'); renderMain();
 });
 ACTIONS['ev-img'] = safe(async el => {
   const file = el.files && el.files[0]; if (!file) return;
@@ -146,7 +146,7 @@ ACTIONS['ev-img'] = safe(async el => {
 });
 FORMS.event = safe(async f => {
   const g = id => $(id, f), ed = evForm.editing ? App.svc.eventsAll().find(e => e.id === evForm.editing) : null;
-  App.svc.saveEvent({ id: evForm.editing || undefined, title: g('#ev-title').value, courseId: g('#ev-course').value || null, category: g('#ev-cat').value, audience: g('#ev-aud').value,
+  await Supa.saveEvent({ id: evForm.editing || undefined, title: g('#ev-title').value, courseId: g('#ev-course').value || null, category: g('#ev-cat').value, audience: g('#ev-aud').value,
     date: g('#ev-date').value, dateEnd: g('#ev-end').value, time: g('#ev-time').value, place: g('#ev-place').value, description: g('#ev-desc').value,
     image: App.evImg || (ed ? ed.image : ''), published: g('#ev-pub').checked });
   const wasEdit = !!evForm.editing; evForm.open = false; evForm.editing = null; App.evImg = null; toast(wasEdit ? 'Evento atualizado.' : 'Evento criado.'); renderMain();

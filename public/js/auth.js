@@ -43,9 +43,11 @@ const showFormError = msg => { const b = $('#form-error'); if (b) b.innerHTML = 
 function enterApp(user) {
   App.user = user; App.svc = App.store.as(user.id); App.screen = 'app'; App.page = 'dashboard'; App.params = {}; App.draft = null; App.answers = {}; App.confirm = null;
   render();
+  if (window.Supa) Supa.refreshCache().catch(e => console.error(e)); // ADMIN/PROFESSOR passam a ver também os eventos ocultos
 }
 function leaveApp() {
   App.store.logout(); App.user = null; App.svc = null; App.screen = 'home'; closeModal(); render();
+  if (window.Supa) Supa.refreshCache().catch(e => console.error(e)); // volta à vista pública (só publicados)
 }
 
 FORMS.login = async f => {
