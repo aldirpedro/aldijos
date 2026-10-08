@@ -73,5 +73,64 @@
       .subscribe();
   }
 
-  window.Supa = { client: supa, refreshCache, saveEvent, toggleEvent, deleteEvent, subscribeRealtime };
+  /*
+   * Catálogo público + as 5 estatísticas da homepage ("Aldijos em números") —
+   * vêm agora do Supabase (cursos, módulos, atividades publicadas, contas
+   * registadas, submissões corrigidas), em vez do localStorage de cada
+   * browser, e atualizam-se sozinhas via Realtime.
+   */
+  async function fetchPublicCourses() {
+    const [{ data: courses, error: cErr }, { data: modules, error: mErr }] = await Promise.all([
+      supa.from('courses').select('*').order('id'),
+      supa.from('modules').select('id, course_id, name').order('id'),
+    ]);
+    if (cErr) throw cErr; if (mErr) throw mErr;
+    return courses.map(c => ({
+      id: String(c.id), name: c.name, area: c.area, short: c.short, description: c.description, years: c.years, photo: c.photo,
+      modules: modules.filter(m => m.course_id === c.id).map(m => m.name),
+    }));
+  }
+
+  async function fetchPublicStats() {
+    const { data, error } = await supa.rpc('get_public_stats').single();
+    if (error) throw error;
+    return { cursos: data.cursos, atividades: data.atividades, alunos: data.alunos, professores: data.professores, concluidas: data.concluidas };
+  }
+
+  async function refreshPublicHome() {
+    const [courses, stats] = await Promise.all([fetchPublicCourses(), fetchPublicStats()]);
+    App.store.setPublicHomeLive(courses, stats);
+  }
+
+  let homeChannel = null;
+  function subscribeHomeRealtime() {
+    if (homeChannel) return;
+    homeChannel = supa.channel('public-home-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => refreshPublicHome().catch(e => console.error(e)))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'modules' }, () => refreshPublicHome().catch(e => console.error(e)))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'activities' }, () => refreshPublicHome().catch(e => console.error(e)))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => refreshPublicHome().catch(e => console.error(e)))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, () => refreshPublicHome().catch(e => console.error(e)))
+      .subscribe();
+  }
+
+  /*
+   * Autenticação — mantém-se o login local (store.js, PBKDF2, continua a
+   * mandar em toda a lógica de negócio ainda local: atividades, turmas,
+   * notas, etc.), mas agora também se abre, com o MESMO email/password, uma
+   * sessão real no Supabase Auth — é essa sessão que dá a auth.uid() usada
+   * pelas políticas de segurança (is_admin(), por exemplo). Se a conta ainda
+   * não existir no Supabase (primeiro login), cria-se aqui mesmo, com o
+   * papel por omissão ALUNO — só muda para ADMIN/PROFESSOR com uma instrução
+   * SQL pontual (ver docs/10_decisoes_tecnicas.md).
+   */
+  async function ensureSession(email, password) {
+    const { error } = await supa.auth.signInWithPassword({ email, password });
+    if (!error) return;
+    const { error: signUpError } = await supa.auth.signUp({ email, password });
+    if (signUpError) throw signUpError;
+  }
+  async function endSession() { await supa.auth.signOut(); }
+
+  window.Supa = { client: supa, refreshCache, saveEvent, toggleEvent, deleteEvent, subscribeRealtime, ensureSession, endSession, refreshPublicHome, subscribeHomeRealtime };
 })();

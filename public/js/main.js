@@ -102,7 +102,11 @@ function pickStorage(kind) {
   window.addEventListener('storage', e => { if (e.key === 'aldijos.db.v1') App.store.reload(); });
   const s = App.store.session();
   if (s) enterApp(s); else render();
-  if (window.Supa) { Supa.refreshCache().catch(e => console.error(e)); Supa.subscribeRealtime(); }
+  if (window.Supa) {
+    Supa.refreshCache().catch(e => console.error(e)); Supa.subscribeRealtime();
+    Supa.refreshPublicHome().catch(e => console.error(e)); Supa.subscribeHomeRealtime();
+    const { data } = await Supa.client.auth.getSession(); App.supaReady = !!data.session;
+  }
   if (App.store.wasMigrated()) toast('Dados de demonstração atualizados para a nova versão.');
   if (!App.persistent) toast('O armazenamento do browser não está disponível: os dados só duram até fechares o separador.', 'error');
 })();

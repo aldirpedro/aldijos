@@ -104,6 +104,17 @@ ACTIONS.unassign = safe(async el => { App.svc.unassignTeacher(el.dataset.t, el.d
 
 /* ---------- eventos ---------- */
 const evForm = { open: false, editing: null };
+ACTIONS['supa-login'] = () => openModal(`<div class="modal-body"><h2 id="modal-title">Ligar conta Supabase</h2>
+  <p style="color:var(--text-muted);">Autoriza esta sessão a escrever eventos na base de dados partilhada. Usa um email real (pode ser diferente do que usas para entrar na Aldijos) — só é preciso fazer isto uma vez por dispositivo.</p>
+  <form data-form="supa-login" novalidate>
+    <div class="field"><label for="sb-email">Email</label><input id="sb-email" type="email" required></div>
+    <div class="field"><label for="sb-pass">Palavra-passe</label><input id="sb-pass" type="password" autocomplete="current-password" required></div>
+    <div class="modal-actions"><button class="btn btn-primary" type="submit">Ligar</button><button class="btn" type="button" data-action="close-modal">Cancelar</button></div>
+  </form></div>`, { plain: true });
+FORMS['supa-login'] = safe(async f => {
+  await Supa.ensureSession($('#sb-email', f).value, $('#sb-pass', f).value);
+  App.supaReady = true; closeModal(); toast('Conta Supabase ligada. Já podes criar/editar eventos.'); renderMain();
+});
 PAGES.ADMIN.eventos = () => {
   const list = App.svc.eventsAll(), courses = App.svc.courses();
   const ed = evForm.editing ? list.find(e => e.id === evForm.editing) : null, v = ed || { published: true, courseId: '' };
@@ -123,6 +134,7 @@ PAGES.ADMIN.eventos = () => {
       <div class="field" style="justify-content:flex-end;"><label style="display:flex; gap:8px; align-items:center; font-size:13px; color:var(--text);"><input id="ev-pub" type="checkbox" ${v.published ? 'checked' : ''}> Publicado (visível para todos)</label></div></div>
     <div class="row-actions"><button class="btn btn-primary" type="submit">${ed ? 'Guardar alterações' : 'Criar evento'}</button><button class="btn" type="button" data-action="ev-cancel">Cancelar</button></div></form>` : '';
   return `<div class="page-head"><div><h1>Eventos</h1><p>Os eventos publicados aparecem na página inicial e nos painéis de alunos e professores.</p></div><button class="btn btn-primary" data-action="ev-new">+ Novo evento</button></div>
+  ${!App.supaReady ? `<div class="box" style="margin:14px 0; display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;"><span>⚠️ Sem sessão Supabase nesta sessão — criar/editar/eliminar eventos vai falhar até ligares.</span><button class="btn btn-sm" data-action="supa-login">Ligar conta Supabase</button></div>` : ''}
   ${form}${list.length ? `<div class="table-wrap" style="margin-top:14px;"><table><thead><tr><th>Evento</th><th>Data</th><th>Estado</th><th>Ações</th></tr></thead><tbody>
     ${list.map(e => `<tr><td>${esc(e.title)}<div class="cell-sub">${esc(e.courseName)} · ${esc(e.category)}</div></td><td class="cell-sub">${esc(fmtEvento(e))}</td>
       <td>${statusText(e.published ? 'PUBLICADA' : 'RASCUNHO').replace('Rascunho', 'Oculto')}</td>

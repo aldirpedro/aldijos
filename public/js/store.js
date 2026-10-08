@@ -279,12 +279,12 @@
     }
     function publicHome() {
       return {
-        courses: db.courses.map(c => ({
+        courses: db.coursesLive || db.courses.map(c => ({
           id: c.id, name: c.name, area: c.area, short: c.short, description: c.description, years: c.years, photo: c.photo,
           modules: db.modules.filter(m => m.courseId === c.id).map(m => m.name),
         })),
         events: publishedEvents().map(e => ({ ...e })),
-        stats: stats(),
+        stats: db.liveStats || stats(),
       };
     }
 
@@ -664,8 +664,11 @@
     // para que publicHome()/publishedEvents() continuem a funcionar sem
     // alterações). Não mexe em mais nada do documento.
     function setEvents(events) { db.events = events; commit(['events']); }
+    // Substitui os cursos (com módulos já incluídos) e as 5 estatísticas públicas
+    // por uma versão vinda do Supabase — mesma ideia do setEvents() acima.
+    function setPublicHomeLive(coursesLive, liveStats) { db.coursesLive = coursesLive; db.liveStats = liveStats; commit(['courses', 'stats']); }
 
-    return { init, wasMigrated: () => migrated, resetDemo, subscribe, reload, session, login, logout, register, publicHome, stats, as, publishedEvents: () => publishedEvents().map(e => ({ ...e })), setEvents, _db: () => db };
+    return { init, wasMigrated: () => migrated, resetDemo, subscribe, reload, session, login, logout, register, publicHome, stats, as, publishedEvents: () => publishedEvents().map(e => ({ ...e })), setEvents, setPublicHomeLive, _db: () => db };
   }
 
   return {

@@ -47,7 +47,7 @@ function enterApp(user) {
 }
 function leaveApp() {
   App.store.logout(); App.user = null; App.svc = null; App.screen = 'home'; closeModal(); render();
-  if (window.Supa) Supa.refreshCache().catch(e => console.error(e)); // volta à vista pública (só publicados)
+  if (window.Supa) { Supa.endSession().catch(e => console.error(e)); Supa.refreshCache().catch(e => console.error(e)); App.supaReady = false; } // volta à vista pública (só publicados)
 }
 
 FORMS.login = async f => {
@@ -55,14 +55,22 @@ FORMS.login = async f => {
   showFormError('');
   if (!email.trim() || !pass) return showFormError('Indica o email e a palavra-passe.');
   btn.disabled = true; btn.textContent = 'A verificar…';
-  try { enterApp(await App.store.login(email, pass)); }
+  try {
+    const user = await App.store.login(email, pass);
+    if (window.Supa) await Supa.ensureSession(email, pass).catch(e => console.error('Supabase auth:', e));
+    enterApp(user);
+  }
   catch (e) { btn.disabled = false; btn.textContent = 'Entrar'; showFormError(e.name === 'AppError' ? e.message : 'Não foi possível entrar. Tenta novamente.'); if (e.name !== 'AppError') console.error(e); }
 };
 FORMS.register = async f => {
   const g = id => $(id, f).value; showFormError('');
   if (g('#r-pass') !== g('#r-pass2')) return showFormError('As palavras-passe não coincidem.');
   const btn = $('button[type=submit]', f); btn.disabled = true; btn.textContent = 'A criar conta…';
-  try { enterApp(await App.store.register({ name: g('#r-name'), email: g('#r-email'), password: g('#r-pass') })); toast('Conta criada. A administração vai associar-te a uma turma.'); }
+  try {
+    const user = await App.store.register({ name: g('#r-name'), email: g('#r-email'), password: g('#r-pass') });
+    if (window.Supa) await Supa.ensureSession(g('#r-email'), g('#r-pass')).catch(e => console.error('Supabase auth:', e));
+    enterApp(user); toast('Conta criada. A administração vai associar-te a uma turma.');
+  }
   catch (e) { btn.disabled = false; btn.textContent = 'Criar conta'; showFormError(e.name === 'AppError' ? e.message : 'Não foi possível criar a conta.'); }
 };
 
