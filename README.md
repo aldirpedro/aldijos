@@ -3,7 +3,7 @@
 <img src="public/img/logo-marca.png" alt="Logótipo ALDIJOS" width="120" />
 
 Plataforma de apoio ao ensino profissional e ao ensino secundário: o professor publica atividades, o aluno responde e submete
-quando lhe convém, a correção é automática (perguntas objetivas) ou feita pelo professor (respostas abertas), e o resultado e o
+dentro do prazo definido, a correção é automática (perguntas objetivas) ou feita pelo professor (respostas abertas), e o resultado e o
 feedback ficam registados. Projeto académico da equipa **Aldir, José e Dinis** (o nome nasce da junção dos três).
 
 ## Estado
@@ -18,9 +18,12 @@ login → professor cria e publica a atividade → aluno responde e submete → 
 - Rodapé profissional: faixa de financiadores e certificações (logótipos brancos sem fundo), empresas parceiras e políticas (privacidade, cookies, termos, acessibilidade,
   qualidade EQAVET, regulamento interno, avaliação, FCT e PAP, oferta formativa, Livro de Reclamações).
 
-**Limitação assumida:** não há servidor. Os dados ficam guardados no browser (`localStorage`), por isso **não são partilhados
-entre computadores** e a segurança é apenas de demonstração. Ver [docs/13_auditoria_funcionalidades.md](docs/13_auditoria_funcionalidades.md)
-e o ADR-007 em [docs/10_decisoes_tecnicas.md](docs/10_decisoes_tecnicas.md).
+**Base de dados real (Supabase):** cursos, turmas, módulos, atividades, submissões, notas e eventos vivem numa base de dados
+Postgres partilhada — o que um professor publica aparece de imediato a um aluno noutro dispositivo qualquer, e as permissões
+são aplicadas na própria base de dados (Row Level Security), não só no código do cliente. Ver o ADR-008 em
+[docs/10_decisoes_tecnicas.md](docs/10_decisoes_tecnicas.md) para o histórico (o ADR-007, nesse mesmo ficheiro, documenta a
+fase anterior, só local, entretanto superada) e [docs/13_auditoria_funcionalidades.md](docs/13_auditoria_funcionalidades.md)
+para o estado funcionalidade a funcionalidade.
 
 ## Como executar
 
@@ -42,14 +45,15 @@ precisa de nenhuma configuração especial:
 1. Em [vercel.com/new](https://vercel.com/new), importe este repositório.
 2. O ficheiro `vercel.json` na raiz já indica que a pasta a publicar é `public/` e que não há
    passo de build a correr — pode deixar tudo como o Vercel sugerir e clicar em **Deploy**.
-3. Não é preciso definir nenhuma variável de ambiente.
+3. Não é preciso definir nenhuma variável de ambiente — a chave do Supabase em `public/js/supabase-config.js`
+   é a chave pública ("publishable"), segura para estar no código (ver secção de Segurança abaixo).
 
-**Aviso:** como os dados ficam em `localStorage` (ver "Limitação assumida" acima), cada
-visitante do site publicado tem os seus próprios dados de demonstração, isolados dos restantes.
+Qualquer visitante do site publicado vê e usa a **mesma base de dados real** — não há cópias isoladas por dispositivo.
 
 ### Contas de demonstração
 
-Palavra-passe de todas: `Aldijos#2026` (só para demonstração).
+Contas reais no Supabase Auth; o ecrã de login usa o mesmo email de sempre (traduzido internamente pela tabela
+`login_aliases`). Palavra-passe de todas: `Aldijos#2026` (só para demonstração).
 
 | Perfil | Email |
 |---|---|
@@ -62,22 +66,28 @@ Há mais 35 alunos e 6 professores (mesmo formato de email). Na página de entra
 ## Estrutura
 
 ```
-public/            aplicação (HTML, CSS, JavaScript e imagens)
-  js/store.js        camada de dados: persistência, autenticação, permissões, correção
-  js/seed.js         dados iniciais de demonstração
+public/                     aplicação (HTML, CSS, JavaScript e imagens)
+  js/store.js                camada de dados local: persistência, permissões, correção (ainda testada em tests/)
+  js/supabase-client.js      ponte para o Supabase (base de dados real, autenticação, ficheiros)
+  js/supabase-config.js      URL + chave pública do projeto Supabase
+  js/seed.js                 dados iniciais de demonstração
   js/ui.js, home.js, auth.js, student.js, teacher.js, admin.js, main.js   interface
-tests/             testes automatizados (node:test)
-scripts/           servidor local e empacotamento
-docs/              análise, requisitos, casos de uso, arquitetura, modelo de dados, testes, ADRs, auditoria
+supabase/migrations/        esquema, políticas de segurança (RLS) e funções SQL, versionados
+tests/                      testes automatizados (node:test)
+scripts/                    servidor local e empacotamento
+docs/                       análise, requisitos, casos de uso, arquitetura, modelo de dados, testes, ADRs, auditoria
 ```
 
 ## Segurança (o que existe e o que não existe)
 
-- Palavras-passe com PBKDF2-SHA-256 e sal; nunca em texto simples. Bloqueio temporário após 5 tentativas falhadas.
-- Todas as leituras e escritas passam por `store.as(utilizador).<método>()`, que verifica o perfil e a posse do recurso
-  (um aluno não abre a submissão de outro; um professor só classifica as suas atividades). Coberto por testes.
+- Autenticação real (Supabase Auth) e permissões aplicadas na própria base de dados (Row Level Security): um aluno não
+  lê a submissão de outro, um professor só classifica as suas atividades, só o Admin escreve estrutura académica — tudo
+  verificado pelo Postgres, não só pelo código do cliente. Ver `supabase/migrations/0002_policies.sql` e seguintes.
+- A chave usada no site (`public/js/supabase-config.js`) é a chave pública ("publishable"): é suposto estar no código,
+  a segurança não depende do seu segredo.
 - Textos introduzidos pelos utilizadores são escapados na interface (sem HTML injetado).
-- **Não existe** proteção contra quem abrir as ferramentas de programador do browser: sem servidor, os dados locais são legíveis.
+- Não existe servidor próprio: por isso "repor palavra-passe" (Admin) envia um email de recuperação em vez de definir a
+  password diretamente. Ver ADR-008 em `docs/10_decisoes_tecnicas.md`.
 
 ## Documentação
 
